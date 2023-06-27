@@ -35,6 +35,7 @@ class Dialog(CTkToplevel):
     def __init__(self, root):
         super().__init__(root)
         self.title('GomokuConnection')
+        self.iconbitmap('logo.ico')
         self.grab_set()
         self.output = ...
 
@@ -100,8 +101,10 @@ class YesNoDialog(Dialog):
 class Notify(CTkToplevel):
     def __init__(self, root):
         super().__init__(root)
+        self.title('GomokuConnection')
         self.geometry()
         self.grab_set()
+        self.iconbitmap('logo.ico')
 
         self.button = CTkButton(self, text='Ok', command=self.destroy, width=80, text_color='#000000')
         self.button.grid(column=1, row=1, padx=5, pady=5, sticky='we')
@@ -152,7 +155,6 @@ class ClientViewModel:
             self.__singleton.enableAllFrame()
             # Get message from Server
         except Exception as e:
-            print('[Error]:', e)
             Notify(self.__singleton.mainWindow).show(f'[Error]: {e}')
 
 
@@ -162,16 +164,13 @@ class BoardViewModel:
 
     def setBoard(self, x, y):
         if x.isnumeric() and y.isnumeric():
-            # To Client
             self.__singleton.client.send(f'<#setboard {x} {y}>')
-            # Receive from Client
-            # To Board
+
             if self.__singleton.client.getAnswer():
                 self.__singleton.board.setBoardXY(int(x), int(y))
 
-    def setPosition(self, pos, x, y):
+    def setPosition(self, pos, x, y, setAtt=True):
         def coordStr2Num(coord: str):
-            # return f'{ord(coord[0]) - 97},{15 - int(coord[1:])}'
             return ord(coord[0]) - 97, int(coord[1:]) - 1
 
         def validString(_x, _y, *arg):
@@ -213,52 +212,38 @@ class BoardViewModel:
                     break
             return string
 
-        # To Client
         position = getString(pos, x, y)
-        # self.__singleton.client.send(f'<#setpos {position[1]}>')
-        print(f'<#setpos {position[1]}>')
+        if setAtt:
+            self.__singleton.client.send(f'<#setpos {position[1]}>')
 
-        # Receive from Client
-
-        # To Board
-        self.__singleton.board.clear()
-        for move in position[0]:
-            self.__singleton.board.addMove(move[0], move[1])
+            if self.__singleton.client.getAnswer():
+                self.__singleton.board.clear()
+                for move in position[0]:
+                    self.__singleton.board.addMove(move[0], move[1])
+        else:
+            self.__singleton.board.clear()
+            for move in position[0]:
+                self.__singleton.board.addMove(move[0], move[1])
 
     def addMove(self, move):
         if self.__singleton.clientState:
-            # To Client
             self.__singleton.client.send(f'<#add {move}>')
-            # Receive and To Board
             return self.__singleton.client.getAnswer()
         else:
             return False
 
-    def clear(self, setAtt=True):
-        # To Client
-        if setAtt:
-            self.__singleton.client.send('<#clear>')
-        # Receive from Client
-        # To Board
+    def clear(self):
+        self.__singleton.client.send('<#clear>')
         if self.__singleton.client.getAnswer():
             self.__singleton.board.clear()
 
-    def undo(self, setAtt=True):
-        # To Client
-        if setAtt:
-            self.__singleton.client.send('<#undo>')
-        # Receive from Client
-        # To Board
+    def undo(self):
+        self.__singleton.client.send('<#undo>')
         if self.__singleton.client.getAnswer():
             self.__singleton.board.undo()
 
-    def redo(self, setAtt=True):
-        # To Client
-        if setAtt:
-            self.__singleton.client.send('<#redo>')
-        # Receive from Client
-        ...
-        # To Board
+    def redo(self):
+        self.__singleton.client.send('<#redo>')
         if self.__singleton.client.getAnswer():
             self.__singleton.board.redo()
 
@@ -317,7 +302,7 @@ class PlayerViewModel:
 
     def detachPlayer2(self, setAtt=True):
         if setAtt:
-            self.__singleton.client.send('<#detach_player_1>')
+            self.__singleton.client.send('<#detach_player_2>')
             if self.__singleton.client.getAnswer():
                 self.__singleton.canvas2.delete(self.__singleton.player2Obj)
                 self.__singleton.player2Obj = ''
@@ -335,10 +320,8 @@ class ChatViewModel:
     def sendMessage(self, message):
         # To ChatBox
         self.__singleton.sendText(f'{self.__singleton.name}: {message}')
-        print(f'{self.__singleton.name}: {message}')
         # To Client
         self.__singleton.client.send(message)
-        ...
 
 
 class Board(CTkFrame):
@@ -665,11 +648,13 @@ class SettingFrame(CTkFrame):
         self.canvas1.grid(column=1, row=0, padx=5, pady=5, sticky='we')
 
         self.seat1Button = CTkButton(self.canvas, text='X', font=('Times New Roman', 14, 'bold'), width=20, height=20,
-                                     fg_color='#413e41', hover_color='#cccccc')
+                                     fg_color='#413e41', hover_color='#cccccc',
+                                     command=self.singleton.playerViewModel.detachPlayer1)
         self.seat1Button.place(x=170, y=10)
 
         self.seat2Button = CTkButton(self.canvas1, text='X', font=('Times New Roman', 14, 'bold'), width=20, height=20,
-                                     fg_color='#413e41', hover_color='#cccccc')
+                                     fg_color='#413e41', hover_color='#cccccc',
+                                     command=self.singleton.playerViewModel.detachPlayer2)
         self.seat2Button.place(x=170, y=10)
 
         # Decorate
@@ -712,22 +697,18 @@ class Client:
     def receive(self):
         while self.STATE:
             message = self.SOCKET.recv(1024).decode().strip()
-            if re.match('^<(.*?)>$', message):
-                print('--> Command:', message)
-                command = re.match("^<(.*?)>$", message).group(1)
-                print('Command After Re:', command)
-                self.handleServerCommand(command)
-            else:
-                print('Message:', message)
-                self.singleton.sendText(message)
+            for text in [s for s in re.split('(<.*?>)', message) if s]:
+                command = re.match('^<(.*?)>$', text)
+                if command:
+                    command = command.group(1)
+                    self.handleServerCommand(command)
+                else:
+                    self.singleton.sendText(text)
 
     def send(self, message):
         self.SOCKET.send(message.encode())
 
     def handleServerCommand(self, command: str):
-        print('command:', command)
-        print('command SP:', command.split())
-        print()
         match command.split():
             case ['setboard', x, y]:
                 self.singleton.board.setBoardXY(int(x), int(y))
@@ -758,6 +739,10 @@ class Client:
                 self.singleton.board.redo()
             case ['clear']:
                 self.singleton.board.clear()
+            case ['setpos', listMove]:
+                x = self.singleton.board.x
+                y = self.singleton.board.y
+                self.singleton.boardViewModel.setPosition(listMove, x, y, False)
 
     def getAnswer(self):
         waitWindow = WaitWindow()
@@ -766,29 +751,15 @@ class Client:
         waitWindow.destroy()
         return self.decideQueue.get()
 
-    def interact(self):
-        name = input('Type your name: ')
-        self.send(name)
-        Thread(target=self.receive, daemon=True).start()
-        while self.STATE:
-            # getInput = input('Message: ')
-            # self.send(getInput)
-            ...
-
-
-class ViewModel:
-    def __init__(self):
-        self.__singleton = Singleton()
-
 
 class View(CTk):
     def __init__(self):
         super().__init__()
 
         self.title('GomokuConnection')
+        self.iconbitmap('logo.ico')
         self.resizable(False, False)
 
-        self.__viewModel = ViewModel()
         self.__singleton = Singleton()
 
         self.board = Board(self)
@@ -808,7 +779,6 @@ class View(CTk):
         self.__singleton.mainWindow = self
         self.__singleton.client = Client()
         self.__singleton.boardToClient = Queue()
-        self.__singleton.viewModel = self.__viewModel
         self.__singleton.setStateFrame = self.setStateFrame
         self.__singleton.enableAllFrame = self.__enableAllFrame
         self.__singleton.name = ''

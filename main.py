@@ -47,7 +47,6 @@ class Server:
                 try:
                     if client != _from:
                         self.__listClient[client].send(message.encode())
-                        # print(f'--> BROADCAST to {client}: {message}')
                 except:
                     exceptionClient.append(client)
                     continue
@@ -84,7 +83,8 @@ class Server:
             return re.match('^<#(.*?)>$', string).group(1)
 
         def getPeople(string):
-            return re.match(r'^@(\w*)', string).group(1), re.split(r'^@\w*', string)[1].strip()
+            output = re.match(r'@(\w+)\s(.+)', string)
+            return output.group(1), output.group(2)
 
         def playerLeave():
             print(f'-> {name} had just left')
@@ -93,7 +93,8 @@ class Server:
 
         # Check name
         name = '_'.join(client.recv(1024).decode().split())
-
+        if name in self.__listClient:
+            name += time.strftime("%M%S")
         self.broadcast(f'{name} has joined')
         print(f'{name} has joined')
         # Broadcast player
@@ -106,6 +107,10 @@ class Server:
 
         boardSize = self.BOARD.getBoardSize()
         self.broadcast(f'<setboard {boardSize[0]} {boardSize[1]}>', _to=name)
+
+        listMove = self.BOARD.getPosition()
+        if listMove:
+            self.broadcast(f'<setpos {listMove}>', _to=name)
 
         while True:
             try:
@@ -121,9 +126,8 @@ class Server:
             match commandType(message):
                 case 0:
                     message = getPeople(message)
-                    self.broadcast(message[1], _from=name, _to=message[0])
+                    self.broadcast(f'{name}: {message[1]}', _from=name, _to=message[0])
                 case 1:
-                    print((getCommand(message), name))
                     self.commandTask.put((getCommand(message), name))
                 case 2:
                     self.broadcast(f'{name}: {message}', _from=name)
@@ -159,25 +163,27 @@ class Server:
             match command[0].split():
                 case ['clear']:
                     if self.GAME_STATE:
-                        response = waitResponse(f'[clear]', command[1])
                         if not checkPermission(command[1]):
                             self.broadcast('<deny>', _to=command[1])
                             self.broadcast('[SERVER] Permission denied', _to=command[1])
                             continue
+                        response = waitResponse(f'[clear]', command[1])
                         if response[0]:
                             self.broadcast('<yes>', _to=command[1])
                             self.BOARD.clear()
-                            self.broadcast(f'<clear>')
+                            self.broadcast(f'<clear>', _from=command[1])
                         else:
                             self.broadcast('<deny>', _to=command[1])
                             self.broadcast(f'[-] {response[1]} refused to [clear]')
                     else:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
                 case ['add', coord]:
                     if self.GAME_STATE:
                         if not checkPermission(command[1]):
                             self.broadcast('<deny>', _to=command[1])
+                            
                             self.broadcast('[SERVER] Permission denied', _to=command[1])
                             continue
                         if self.BOARD.checkValid(coord):
@@ -188,11 +194,13 @@ class Server:
                             self.broadcast('<deny>', _to=command[1])
                     else:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
                 case ['setboard', x, y]:
                     if self.GAME_STATE:
                         if not checkPermission(command[1]):
                             self.broadcast('<deny>', _to=command[1])
+                            
                             self.broadcast('[SERVER] Permission denied', _to=command[1])
                             continue
                         response = waitResponse(f'[set board {x}x{y}]', command[1])
@@ -200,17 +208,20 @@ class Server:
                             self.broadcast('<yes>', _to=command[1])
                             self.BOARD.setBoard(x, y)
                             self.BOARD.clear()
-                            self.broadcast(f'<setboard {x} {y}>')
+                            self.broadcast(f'<setboard {x} {y}>', _from=command[1])
                         else:
                             self.broadcast('<deny>', _to=command[1])
+                            
                             self.broadcast(f'[-] {response[1]} refused to [set board {x}x{y}]')
                     else:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
                 case ['undo']:
                     if self.GAME_STATE:
                         if not checkPermission(command[1]):
                             self.broadcast('<deny>', _to=command[1])
+                            
                             self.broadcast('[SERVER] Permission denied', _to=command[1])
                             continue
                         if self.BOARD.checkValid('undo'):
@@ -221,11 +232,13 @@ class Server:
                                 self.BOARD.undo()
                             else:
                                 self.broadcast('<deny>', _to=command[1])
+                                
                                 self.broadcast(f'[-] {response[1]} refused to undo')
                         else:
                             self.broadcast('<deny>', _to=command[1])
                     else:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
                 case ['redo']:
                     if self.GAME_STATE:
@@ -241,15 +254,39 @@ class Server:
                                 self.BOARD.redo()
                             else:
                                 self.broadcast('<deny>', _to=command[1])
+                                
                                 self.broadcast(f'[-] {response[1]} refused to redo')
                         else:
                             self.broadcast('<deny>', _to=command[1])
                     else:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
+                case ['setpos', listMove]:
+                    if self.GAME_STATE:
+                        if not checkPermission(command[1]):
+                            self.broadcast('<deny>', _to=command[1])
+                            
+                            self.broadcast('[SERVER] Permission denied', _to=command[1])
+                            continue
+                        response = waitResponse(f'[setpos {listMove}]', command[1])
+                        if response[0]:
+                            self.broadcast('<yes>', _to=command[1])
+                            self.BOARD.setPosition(listMove)
+                            self.broadcast(f'<setpos {listMove}>', _from=command[1])
+                        else:
+                            self.broadcast('<deny>', _to=command[1])
+                            
+                            self.broadcast(f'[-] {response[1]} refused to set position')
+                    else:
+                        self.broadcast('<deny>', _to=command[1])
+                        
+                        self.__listClient[command[1]].send('[SERVER] Wait player...'.encode())
+
                 case ['setplayer_1']:
                     if checkPermission(command[1]) or self.player_1 is not None:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.broadcast('[SERVER] Permission denied', _to=command[1])
                         continue
                     self.broadcast('<yes>', _to=command[1])
@@ -261,6 +298,7 @@ class Server:
                 case ['setplayer_2']:
                     if checkPermission(command[1]) or self.player_2 is not None:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.broadcast('[SERVER] Permission denied', _to=command[1])
                         continue
                     self.broadcast('<yes>', _to=command[1])
@@ -272,6 +310,7 @@ class Server:
                 case ['detach_player_1']:
                     if self.player_1 != command[1]:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.broadcast('[SERVER] Permission denied', _to=command[1])
                         continue
                     self.broadcast('<yes>', _to=command[1])
@@ -279,10 +318,11 @@ class Server:
                     self.player_1 = None
                     self.__clientPermission[command[1]] = 0
                     self.checkGameState()
-                    self.broadcast('<detach_player_1>')
+                    self.broadcast('<detach_player_1>', _from=command[1])
                 case ['detach_player_2']:
                     if self.player_2 != command[1]:
                         self.broadcast('<deny>', _to=command[1])
+                        
                         self.broadcast('[SERVER] Permission denied', _to=command[1])
                         continue
                     self.broadcast('<yes>', _to=command[1])
@@ -290,7 +330,7 @@ class Server:
                     self.player_2 = None
                     self.__clientPermission[command[1]] = 0
                     self.checkGameState()
-                    self.broadcast('<detach_player_2>')
+                    self.broadcast('<detach_player_2>', _from=command[1])
 
     def interact(self):
         while self.STATE:
@@ -310,36 +350,12 @@ class Server:
 
     def acceptClientConnection(self):
         while True:
-            client, address = self.SOCKET.accept()
-            client.send('[SERVER] Welcome'.encode())
-            Thread(target=self.handleClientConnection, args=(client,), daemon=True).start()
-
-
-class Client:
-    def __init__(self, host, port):
-        self.__host = host
-        self.__port = port
-        self.SOCKET = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.SOCKET.connect((self.__host, self.__port))
-        self.STATE = 1
-
-        Thread(target=self.receive, daemon=True).start()
-        Thread(target=self.interact, daemon=True).start()
-
-    def receive(self):
-        while self.STATE:
-            message = self.SOCKET.recv(1024).decode().strip()
-            print(message)
-
-    def send(self, message):
-        self.SOCKET.send(message.encode())
-
-    def interact(self):
-        name = input('Type your __name: ')
-        self.send(name)
-        while self.STATE:
-            getInput = input('Message: ')
-            self.send(getInput)
+            try:
+                client, address = self.SOCKET.accept()
+                client.send('[SERVER] Welcome'.encode())
+                Thread(target=self.handleClientConnection, args=(client,), daemon=True).start()
+            except Exception as e:
+                print(f'[Error "acceptClientConnection"] {e}')
 
 
 class Board:
@@ -378,7 +394,53 @@ class Board:
                 return action not in self.__listCoord
 
     def setPosition(self, pos):
-        ...
+        def coordStr2NumStr(coord: str):
+            # return f'{ord(coord[0]) - 97},{15 - int(coord[1:])}'
+            return f'{ord(coord[0]) - 97},{int(coord[1:]) - 1}'
+
+        def validString(_x, _y, *arg):
+            """
+            param n: Length of Board
+            """
+            for coord in arg:
+                try:
+                    # if ord(coord[0]) - 96 < 0 or ord(coord[0]) - 96 > y or int(coord[1:]) < 0 or int(coord[1:]) > y:
+                    if ord(coord[0]) - 96 < 0 or \
+                            ord(coord[0]) - 96 > _x or \
+                            int(coord[1:]) < 0 or \
+                            int(coord[1:]) > _y:
+                        return False
+                except:
+                    return False
+            return True
+
+        def formatString(string, _x, _y):
+            listMove = []
+            stringCoord = ''
+            while string:
+                cur = string[0]
+                string = string[1:]
+                while len(string) > 0 and string[0].isnumeric():
+                    cur += string[0]
+                    string = string[1:]
+                if validString(_x, _y, cur):
+                    listMove.append(coordStr2NumStr(cur))
+                    stringCoord += cur
+            return listMove
+
+        def getString(string, _x, _y):
+            while string:
+                if not validString(_x, _y, string[:2]):
+                    string = string[1:]
+                else:
+                    string = formatString(string, _x, _y)
+                    break
+            return string
+
+        position = getString(pos, self.w, self.h)
+        self.clear()
+        for move in position:
+            self.addMove(move)
 
     def getPosition(self):
         return getPositionFromList(self.__listCoord)
