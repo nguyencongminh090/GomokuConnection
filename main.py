@@ -190,6 +190,7 @@ class Server:
         
         while self.STATE:
             if self.commandTask.empty():
+                time.sleep(0.05)
                 continue
             command = self.commandTask.get()
 
