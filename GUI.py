@@ -1,3 +1,6 @@
+# Author: nguyencongminh090
+# Github: <https://github.com/nguyencongminh090/GomokuConnection>
+
 from customtkinter import *
 import customtkinter
 from queue import Queue
@@ -5,8 +8,18 @@ import socket
 from threading import Thread
 import re
 
+# just for setting window icon
+import platform
+import tkinter
 
 customtkinter.set_default_color_theme('theme.json')
+
+def setIcon(window):
+    if(platform.system() == 'Windows'):
+        window.iconbitmap('logo.ico')
+    else:
+        icon = tkinter.PhotoImage(file='logo.png')
+        window.iconphoto(True, icon)
 
 
 def roundNum(number, places=0):
@@ -17,12 +30,14 @@ def roundNum(number, places=0):
     return rounded
 
 
+
+
 class WaitWindow(CTkToplevel):
     def __init__(self):
         self.__singleton = Singleton()
         super().__init__(self.__singleton.mainWindow)
         self.title('GomokuConnection')
-        self.grab_set()
+        # self.grab_set()
         self.overrideredirect(True)
         self.label = CTkLabel(self, text='Wait server to process...')
         self.label.grid(column=0, row=0, padx=5, pady=5, sticky='we')
@@ -35,12 +50,12 @@ class Dialog(CTkToplevel):
     def __init__(self, root):
         super().__init__(root)
         self.title('GomokuConnection')
-        self.iconbitmap('logo.ico')
-        self.grab_set()
+        setIcon(self)
         self.output = ...
 
     def show(self):
         self.setAttr()
+        self.grab_set() # it must be called after setAttr() under Linux
         self.wait_window()
         return self.output
 
@@ -67,6 +82,7 @@ class NameDialog(Dialog):
         self.button.grid(column=1, row=1, padx=5, pady=5, sticky='e')
 
         self.entry.bind('<Return>', lambda e: self.onClick())
+        self.after(150, lambda: self.entry.focus())
         self.button.configure(command=self.onClick)
 
     def getInfo(self):
@@ -103,8 +119,7 @@ class Notify(CTkToplevel):
         super().__init__(root)
         self.title('GomokuConnection')
         self.geometry()
-        self.grab_set()
-        self.iconbitmap('logo.ico')
+        setIcon(self)
 
         self.button = CTkButton(self, text='Ok', command=self.destroy, width=80, text_color='#000000')
         self.button.grid(column=1, row=1, padx=5, pady=5, sticky='we')
@@ -114,7 +129,7 @@ class Notify(CTkToplevel):
     def show(self, text):
         self.__setattr__('label', CTkLabel(self, text=text.center(50)))
         self.label.grid(column=0, row=0, columnspan=3, padx=5, pady=(5, 0), sticky='we')
-            
+        self.grab_set()
 
 class Singleton(object):
     def __new__(cls):
@@ -232,6 +247,10 @@ class BoardViewModel:
         else:
             return False
 
+    def commit(self):
+        self.__singleton.client.send('<#commit>')
+        return self.__singleton.client.getAnswer()
+        
     def clear(self):
         self.__singleton.client.send('<#clear>')
         if self.__singleton.client.getAnswer():
@@ -289,39 +308,48 @@ class PlayerViewModel:
                                                                                fill="black", anchor='w')
 
     def detachPlayer1(self, setAtt=True):
+        detach = True
         if setAtt:
             self.__singleton.client.send('<#detach_player_1>')
-            if self.__singleton.client.getAnswer():
-                self.__singleton.canvas1.delete(self.__singleton.player1Obj)
-                self.__singleton.player1Obj = ''
-                self.__singleton.player1Name = ''
-        else:
+            if self.__singleton.client.getAnswer() == False:
+                detach = False
+        if detach:
             self.__singleton.canvas1.delete(self.__singleton.player1Obj)
             self.__singleton.player1Obj = ''
             self.__singleton.player1Name = ''
+            if (self.__singleton.player2Name != ''):
+                self.__singleton.canvas2.itemconfigure(self.__singleton.player2Obj, fill="black")
 
     def detachPlayer2(self, setAtt=True):
+        detach = True
         if setAtt:
             self.__singleton.client.send('<#detach_player_2>')
-            if self.__singleton.client.getAnswer():
-                self.__singleton.canvas2.delete(self.__singleton.player2Obj)
-                self.__singleton.player2Obj = ''
-                self.__singleton.player2Name = ''
-        else:
+            if self.__singleton.client.getAnswer() == False:
+                detach = False
+        if detach:
             self.__singleton.canvas2.delete(self.__singleton.player2Obj)
             self.__singleton.player2Obj = ''
             self.__singleton.player2Name = ''
-
+            if (self.__singleton.player1Name != ''):
+                self.__singleton.canvas1.itemconfigure(self.__singleton.player1Obj, fill="black")
+    
+    def highlightPlayer(self, playerName):
+        conf_fill = "green" if playerName == self.__singleton.player1Name else "black"
+        self.__singleton.canvas1.itemconfigure(self.__singleton.player1Obj, fill=conf_fill)
+        
+        conf_fill = "green" if playerName == self.__singleton.player2Name else "black"
+        self.__singleton.canvas2.itemconfigure(self.__singleton.player2Obj, fill=conf_fill)
 
 class ChatViewModel:
     def __init__(self):
         self.__singleton = Singleton()
 
     def sendMessage(self, message):
-        # To ChatBox
-        self.__singleton.sendText(f'{self.__singleton.name}: {message}')
-        # To Client
-        self.__singleton.client.send(message)
+        if (message != ''):
+        	# To ChatBox
+        	self.__singleton.sendText(f'{self.__singleton.name}: {message}')
+        	# To Client
+        	self.__singleton.client.send(message)
 
 
 class Board(CTkFrame):
@@ -551,11 +579,8 @@ class ChatFrame(CTkFrame):
 
         self.grid_columnconfigure(1, weight=1)
         # TextBox
-        self.textBox = CTkTextbox(self, height=150, width=450, state='disabled')
+        self.textBox = CTkTextbox(self, height=150, width=300, state='disabled')
         self.textBox.grid(row=0, column=0, columnspan=40, padx=5, pady=5, sticky='we')
-        # Label
-        self.label = CTkLabel(self, text='Message:')
-        self.label.grid(column=0, row=1, padx=5, pady=5, sticky='w')
         # Entry
         self.entry = CTkEntry(self, placeholder_text='message...')
         self.entry.grid(column=1, row=1, padx=5, pady=5, sticky='we')
@@ -612,7 +637,7 @@ class SettingFrame(CTkFrame):
         self.entryX.grid(column=1, row=0, padx=5, sticky='we')
         self.entryY = CTkEntry(self.frame, width=30, justify='center')
         self.entryY.grid(column=3, row=0, padx=5, sticky='we')
-        self.entryPos = CTkEntry(self.frame, width=290)
+        self.entryPos = CTkEntry(self.frame, width=200)
         self.entryPos.grid(column=1, row=1, columnspan=3, padx=5, sticky='we')
 
         self.setBoard = CTkButton(self.frame, text='Set', fg_color='#c7c7c7', text_color='#000000', width=80)
@@ -629,33 +654,36 @@ class SettingFrame(CTkFrame):
                                                                                       self.singleton.board.y))
 
         # Group 2
-        self.undoButton = CTkButton(self.frame1, text='Undo', fg_color='#c7c7c7', text_color='#000000')
-        self.undoButton.grid(column=0, row=2, padx=5, pady=5, sticky='we')
-        self.redoButton = CTkButton(self.frame1, text='Redo', fg_color='#c7c7c7', text_color='#000000')
-        self.redoButton.grid(column=1, row=2, padx=5, pady=5, sticky='we')
-        self.clearButton = CTkButton(self.frame1, text='Clear', fg_color='#c7c7c7', text_color='#000000')
+        self.commitButton = CTkButton(self.frame1, text='Commit', width=80, fg_color='#c7c7c7', text_color='#000000')
+        self.commitButton.grid(column=0, row=2, padx=5, pady=5, sticky='we')
+        self.undoButton = CTkButton(self.frame1, text='Undo', width=80, fg_color='#c7c7c7', text_color='#000000')
+        self.undoButton.grid(column=1, row=2, padx=5, pady=5, sticky='we')
+        self.redoButton = CTkButton(self.frame1, text='Redo', width=80, fg_color='#c7c7c7', text_color='#000000')
+        self.redoButton.grid(column=2, row=2, padx=5, pady=5, sticky='we')
+        self.clearButton = CTkButton(self.frame1, text='Clear', width=80, fg_color='#c7c7c7', text_color='#000000')
         self.clearButton.grid(column=3, row=2, padx=5, pady=5, sticky='we')
 
+        self.commitButton.configure(command=self.__viewModel.commit)
         self.clearButton.configure(command=self.__viewModel.clear)
         self.undoButton.configure(command=self.__viewModel.undo)
         self.redoButton.configure(command=self.__viewModel.redo)
 
         # Group 3
-        self.canvas = CTkCanvas(self.frame2, width=200, height=40, bg='#ffffff', highlightthickness=0)
+        self.canvas = CTkCanvas(self.frame2, width=170, height=40, bg='#ffffff', highlightthickness=0)
         self.canvas.grid(column=0, row=0, padx=5, pady=5, sticky='we')
 
-        self.canvas1 = CTkCanvas(self.frame2, width=200, height=40, bg='#ffffff', highlightthickness=0)
+        self.canvas1 = CTkCanvas(self.frame2, width=170, height=40, bg='#ffffff', highlightthickness=0)
         self.canvas1.grid(column=1, row=0, padx=5, pady=5, sticky='we')
 
         self.seat1Button = CTkButton(self.canvas, text='X', font=('Times New Roman', 14, 'bold'), width=20, height=20,
                                      fg_color='#413e41', hover_color='#cccccc',
                                      command=self.singleton.playerViewModel.detachPlayer1)
-        self.seat1Button.place(x=170, y=10)
+        self.seat1Button.place(x=140, y=10)
 
         self.seat2Button = CTkButton(self.canvas1, text='X', font=('Times New Roman', 14, 'bold'), width=20, height=20,
                                      fg_color='#413e41', hover_color='#cccccc',
                                      command=self.singleton.playerViewModel.detachPlayer2)
-        self.seat2Button.place(x=170, y=10)
+        self.seat2Button.place(x=140, y=10)
 
         # Decorate
         self.canvas.create_rectangle(0, 0, 20, 40, fill='#000000')
@@ -730,6 +758,11 @@ class Client:
                     self.send('<#yes>')
                 else:
                     self.send('<#no>')
+            case ['turn', name]:
+                if (name == self.singleton.name):
+                    self.singleton.playerViewModel.highlightPlayer(name)
+                else:
+                    self.singleton.playerViewModel.highlightPlayer('')
             case ['add', move]:
                 x, y = move.split(',')
                 self.singleton.board.addMove(int(x), int(y))
@@ -757,8 +790,8 @@ class View(CTk):
         super().__init__()
 
         self.title('GomokuConnection')
-        self.iconbitmap('logo.ico')
         self.resizable(False, False)
+        setIcon(self)
 
         self.__singleton = Singleton()
 
