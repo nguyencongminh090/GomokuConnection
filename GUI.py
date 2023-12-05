@@ -107,6 +107,7 @@ class Dialog(CTkToplevel):
 
     def show(self):
         self.setAttr()
+        self.update()
         self.grab_set() # it must be called after setAttr() under Linux
         self.wait_window()
         return self.output
@@ -145,6 +146,7 @@ class NameDialog(Dialog):
 class YesNoDialog(Dialog):
     def show(self, question):
         self.setAttr(question)
+        self.update()
         self.grab_set()
         self.wait_window()
         return self.output
@@ -887,11 +889,17 @@ class Client:
         self.singleton.updatePosText()
 
     def getAnswer(self):
-        self.singleton.mainWindow.title(STR_TITLE_WAITING)
-        self.singleton.mainWindow.update()
+        cnt_delay = 0
         while self.decideQueue.empty():
-            time.sleep(0.05)
-        self.singleton.mainWindow.title(STR_APP_NAME)
+            if (cnt_delay == 10):
+                self.singleton.mainWindow.title(STR_TITLE_WAITING)
+                self.singleton.mainWindow.update()
+            time.sleep(0.01)
+            cnt_delay += 1
+
+        if (cnt_delay > 10):
+            self.singleton.mainWindow.title(STR_APP_NAME)
+        
         return self.decideQueue.get()
 
 

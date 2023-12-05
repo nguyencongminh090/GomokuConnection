@@ -182,7 +182,7 @@ class Server:
             self.broadcast(f'<ask Allow {_name} to {_command}?>', _to=opponent)
             while self.STATE:
                 if self.commandTask.empty():
-                    time.sleep(0.05)
+                    time.sleep(0.01)
                     continue
                 else:
                     _command = self.commandTask.get()
@@ -194,7 +194,7 @@ class Server:
         
         while self.STATE:
             if self.commandTask.empty():
-                time.sleep(0.05)
+                time.sleep(0.01)
                 continue
             command = self.commandTask.get()
 
