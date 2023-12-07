@@ -9,9 +9,43 @@ from threading import Thread
 import time
 import re
 
+# strings used in the GUI
+
+STR_APP_NAME = 'GomokuConnection'
+
+STR_LABEL_BOARD_SIZE = 'Board:'
+STR_LABEL_POSITION = 'Position:'
+STR_BUTTON_SET = 'Set'
+
+STR_BUTTON_PASS = 'Pass'
+STR_BUTTON_UNDO = 'Undo'
+STR_BUTTON_REDO = 'Redo'
+STR_BUTTON_CLEAR = 'Clear'
+
+STR_LABEL_HOST = 'Host:'
+STR_LABEL_PORT = 'Port:'
+STR_BUTTON_CONNECT = 'Connect to server'
+
+STR_CHAT_ENTRY_PLACEHOLDER = 'message...'
+STR_BUTTON_SEND = 'Send'
+
+STR_ENTER_NAME = 'Enter nick name:'
+STR_BUTTON_CONFIRM = 'Confirm'
+STR_BUTTON_YES = 'Yes'
+STR_BUTTON_NO = 'No'
+
+STR_TITLE_WAITING = STR_APP_NAME + ' - Waiting server to process...'
+
+STR_APP_INTRO = '[Introduction] ' \
+                + 'An equivalent of the Gomoku Swap2 rule is defined here. ' \
+                + "It's your turn when your name becomes green; " \
+                + 'on opening, press the Pass button to hand over the next stone and end the ' \
+                + 'opening. Click on the side of the board to switch the background color.\n'
+
 import locale
 locale.setlocale(locale.LC_ALL, '')
 locale_str = locale.getlocale()[0]
+
 if (locale_str.startswith('vi') or 'Vi' in locale_str):
     STR_APP_NAME = 'Bàn trò chơi năm liên'
 
@@ -44,38 +78,68 @@ if (locale_str.startswith('vi') or 'Vi' in locale_str):
                   + 'Khi khai cuộc, nhấn nút "Giao cho" để bàn giao quân cờ tiếp theo và ' \
                   + 'kết thúc khai cuộc. Nhấp vào cạnh của bảng để chuyển đổi màu nền.\n'
     
-else:
-    STR_APP_NAME = 'GomokuConnection'
+elif (locale_str.startswith('pl') or 'Pol' in locale_str):
+    STR_APP_NAME = 'Kółko i krzyżyk Połączenie'
+    
+    STR_LABEL_BOARD_SIZE = 'Rozmiar deski:'
+    STR_LABEL_POSITION = 'Zapis gry:'
+    STR_BUTTON_SET = 'Ustawianie'
 
-    STR_LABEL_BOARD_SIZE = 'Board:'
-    STR_LABEL_POSITION = 'Position:'
-    STR_BUTTON_SET = 'Set'
+    STR_BUTTON_PASS = 'Podaj'
+    STR_BUTTON_UNDO = 'Cofnij'
+    STR_BUTTON_REDO = 'Ponawianie'
+    STR_BUTTON_CLEAR = 'Wyczyść'
 
-    STR_BUTTON_PASS = 'Pass'
-    STR_BUTTON_UNDO = 'Undo'
-    STR_BUTTON_REDO = 'Redo'
-    STR_BUTTON_CLEAR = 'Clear'
-
-    STR_LABEL_HOST = 'Host:'
+    STR_LABEL_HOST = 'Serwer:'
     STR_LABEL_PORT = 'Port:'
-    STR_BUTTON_CONNECT = 'Connect to server'
+    STR_BUTTON_CONNECT = 'Połącz'
 
-    STR_CHAT_ENTRY_PLACEHOLDER = 'message...'
-    STR_BUTTON_SEND = 'Send'
+    STR_CHAT_ENTRY_PLACEHOLDER = 'wyślij wiadomość...'
+    STR_BUTTON_SEND = 'Wyślij'
 
-    STR_ENTER_NAME = 'Enter nick name:'
-    STR_BUTTON_CONFIRM = 'Confirm'
-    STR_BUTTON_YES = 'Yes'
-    STR_BUTTON_NO = 'No'
+    STR_ENTER_NAME = 'Wpisz swój nick:'
+    STR_BUTTON_CONFIRM = 'Potwierdź'
+    STR_BUTTON_YES = 'Tak'
+    STR_BUTTON_NO = 'Nie'
 
-    STR_TITLE_WAITING = STR_APP_NAME + ' - Waiting server to process...'
-    
-    STR_APP_INTRO = '[Introduction] ' \
-                  + 'An equivalent of the Gomoku Swap2 rule is defined here. ' \
-                  + "It's your turn when your name becomes green; " \
-                  + 'on opening, press the Pass button to hand over the next rock and end the ' \
-                  + 'opening. Click on the side of the board to switch the background color.\n'
-    
+    STR_TITLE_WAITING = STR_APP_NAME + ' - Oczekiwanie na przetwarzanie przez serwer...'
+
+    STR_APP_INTRO = '[Wprowadzenie] ' \
+                  + 'Odpowiednik reguły Gomoku Swap2 jest zdefiniowany tutaj. ' \
+                  + 'Nadeszła twoja kolej, gdy twoje imię zmieni kolor na zielony; ' \
+                  + 'przy otwarciu naciśnij przycisk “Podaj”, aby przekazać następny kamień ' \
+                  + 'i zakończyć otwarcie. Kliknij z boku planszy, aby zmienić kolor tła.\n' \
+
+elif (locale_str.startswith('zh') or 'Chi' in locale_str):
+    STR_APP_NAME = '五子连'
+
+    STR_LABEL_BOARD_SIZE = '棋盘大小:'
+    STR_LABEL_POSITION = '打谱:'
+    STR_BUTTON_SET = '设定'
+
+    STR_BUTTON_PASS = '递交'
+    STR_BUTTON_UNDO = '悔棋'
+    STR_BUTTON_REDO = '重做'
+    STR_BUTTON_CLEAR = '清空'
+
+    STR_LABEL_HOST = '服务器:'
+    STR_LABEL_PORT = '端口:'
+    STR_BUTTON_CONNECT = '连接'
+
+    STR_CHAT_ENTRY_PLACEHOLDER = '发送消息...'
+    STR_BUTTON_SEND = '发送'
+
+    STR_ENTER_NAME = '输入网名:'
+    STR_BUTTON_CONFIRM = '确认'
+    STR_BUTTON_YES = '是'
+    STR_BUTTON_NO = '否'
+
+    STR_TITLE_WAITING = STR_APP_NAME + ' - 正在等待服务器处理...'
+
+    STR_APP_INTRO = '[简介] 这里的游戏规则相当于 Gomoku Swap2。当你的网名变绿时，轮到你下子；' \
+                  + '开局时，可点击"递交"按钮交出下一粒棋子并结束开局。单击棋盘的边缘以切换背景颜色。\n'
+
+
 customtkinter.set_default_color_theme('theme.json')
 
 import platform
@@ -312,7 +376,8 @@ class BoardViewModel:
 class PlayerViewModel:
     def __init__(self):
         self.__singleton = Singleton()
-        self.font = customtkinter.CTkFont(family='Times New Roman', size=14, weight='bold')
+        self.font_normal = customtkinter.CTkFont(family='Times New Roman', size=14, weight='bold')
+        self.font_underline = customtkinter.CTkFont(family='Times New Roman', size=14, weight='bold', underline=1)
 
     def takeSeat1(self, name, setAtt=True):
         if not self.__singleton.clientState:
@@ -323,13 +388,13 @@ class PlayerViewModel:
                 self.__singleton.player1Name = name
                 name = name[:12] + '...' if len(name) > 12 else name
                 self.__singleton.player1Obj = self.__singleton.canvas1.create_text(30, 20, text=name,
-                                                                                   font=self.font,
+                                                                                   font=self.font_normal,
                                                                                    fill="black", anchor='w')
         else:
             self.__singleton.player1Name = name
             name = name[:12] + '...' if len(name) > 12 else name
             self.__singleton.player1Obj = self.__singleton.canvas1.create_text(30, 20, text=name,
-                                                                               font=self.font,
+                                                                               font=self.font_normal,
                                                                                fill="black", anchor='w')
 
     def takeSeat2(self, name, setAtt=True):
@@ -341,13 +406,13 @@ class PlayerViewModel:
                 self.__singleton.player2Name = name
                 name = name[:12] + '...' if len(name) > 12 else name
                 self.__singleton.player2Obj = self.__singleton.canvas2.create_text(30, 20, text=name,
-                                                                                   font=self.font,
+                                                                                   font=self.font_normal,
                                                                                    fill="black", anchor='w')
         else:
             self.__singleton.player2Name = name
             name = name[:12] + '...' if len(name) > 12 else name
             self.__singleton.player2Obj = self.__singleton.canvas2.create_text(30, 20, text=name,
-                                                                               font=self.font,
+                                                                               font=self.font_normal,
                                                                                fill="black", anchor='w')
 
     def detachPlayer1(self, setAtt=True):
@@ -377,13 +442,19 @@ class PlayerViewModel:
                 self.__singleton.canvas1.itemconfigure(self.__singleton.player1Obj, fill="black")
     
     def highlightPlayer(self, playerName):
-        color_light = "#03a800" if playerName == self.__singleton.name else "#0000e0"
-        
-        color_fill = color_light if playerName == self.__singleton.player1Name else "black"
-        self.__singleton.canvas1.itemconfigure(self.__singleton.player1Obj, fill=color_fill)
-        
-        color_fill = color_light if playerName == self.__singleton.player2Name else "black"
-        self.__singleton.canvas2.itemconfigure(self.__singleton.player2Obj, fill=color_fill)
+        turn_player1 = (self.__singleton.player1Name == playerName)
+        turn_player2 = (self.__singleton.player2Name == playerName)
+        turn_self    = (self.__singleton.name        == playerName)
+        self.__singleton.canvas1.itemconfigure( \
+            self.__singleton.player1Obj, \
+            fill = "green" if turn_self and turn_player1 else "black", \
+            font = self.font_underline if turn_player1 else self.font_normal \
+        )
+        self.__singleton.canvas2.itemconfigure( \
+            self.__singleton.player2Obj, \
+            fill = "green" if turn_self and turn_player2 else "black", \
+            font = self.font_underline if turn_player2 else self.font_normal \
+        )
 
 
 class ChatViewModel:
@@ -502,7 +573,8 @@ class Board(CTkFrame):
         return move
 
     def __valid(self, x, y):
-        return 0 <= x - self.__boardGap <= self.__boardWSize and 0 <= y - self.__boardGap <= self.__boardHSize
+        return     0.5*self.__boardGap <= x <= self.__boardWSize + 1.5*self.__boardGap \
+               and 0.5*self.__boardGap <= y <= self.__boardWSize + 1.5*self.__boardGap
 
     def __realtime(self, event):
         def hoverSquare():
