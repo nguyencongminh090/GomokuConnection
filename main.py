@@ -27,7 +27,7 @@ class Server:
         self.__clientPermission = {}
 
         self.commandTask = Queue()
-        self.BOARD = Board(19, 15)
+        self.BOARD = Board(15, 15)
 
         self.STATE = 1              # the server is running
         self.GAME_STATE = 0         # 0: waiting for player  1: playing game
@@ -103,6 +103,7 @@ class Server:
             name += time.strftime("%M%S")
         self.broadcast(f'{name} has joined')
         print(f'{name} has joined')
+        
         # Broadcast player
         self.__listClient[name] = client
         self.__clientPermission[name] = 0
@@ -110,7 +111,10 @@ class Server:
         for idx, player in enumerate([self.player_1, self.player_2]):
             if player is not None:
                 self.broadcast(f'<setplayer_{idx + 1} {player}>', _to=name)
-
+        
+        if (self.GAME_STATE):
+            self.broadcast(f'<turn {self.player_1 if self.GAME_TURN == 1 else self.player_2}>')
+        
         boardSize = self.BOARD.getBoardSize()
         self.broadcast(f'<setboard {boardSize[0]} {boardSize[1]}>', _to=name)
 
@@ -178,7 +182,7 @@ class Server:
             self.broadcast(f'<ask Allow {_name} to {_command}?>', _to=opponent)
             while self.STATE:
                 if self.commandTask.empty():
-                    time.sleep(0.05)
+                    time.sleep(0.01)
                     continue
                 else:
                     _command = self.commandTask.get()
@@ -190,7 +194,7 @@ class Server:
         
         while self.STATE:
             if self.commandTask.empty():
-                time.sleep(0.05)
+                time.sleep(0.01)
                 continue
             command = self.commandTask.get()
 
@@ -219,6 +223,10 @@ class Server:
                         self.broadcast(f'[-] {response[1]} refused to [clear]')
                 
                 case ['setboard', x, y]:
+                    if (int(x) < 5 or int(y) < 5 or int(x) > 26 or int(y) > 26):
+                        self.broadcast('<deny>', _to=cmd_sender)
+                        continue
+
                     response = waitResponse(f'[set board {x}x{y}]', cmd_sender)
                     if response[0]:
                         self.broadcast('<yes>', _to=cmd_sender)
@@ -249,7 +257,7 @@ class Server:
                     else:
                         self.broadcast('<deny>', _to=cmd_sender)
 
-                case ['commit']:
+                case ['pass']:
                     rec_len = self.BOARD.getRecordLen()
                     
                     valid = False
@@ -261,11 +269,11 @@ class Server:
                         self.broadcast('<yes>', _to=cmd_sender)
                         self.GAME_OPENING = False
                         self.GAME_TURN = nextTurn(self.GAME_TURN)
-                        self.broadcast('<commit>', _from=cmd_sender)
+                        self.broadcast('<pass>', _from=cmd_sender)
                         broadcastTurn()
                     else:
                         self.broadcast('<deny>', _to=cmd_sender)
-                        self.broadcast('[SERVER] Command denied', _to=cmd_sender)
+                        self.broadcast('[SERVER] Denied: pass command is for the Swap2 opening rule', _to=cmd_sender)
                     
                 case ['undo']:
                     if self.GAME_OPENING == False and self.BOARD.checkValid('undo'):
@@ -303,6 +311,8 @@ class Server:
                     else:
                         self.broadcast('<deny>', _to=cmd_sender)
                         self.broadcast(f'[-] {response[1]} refused to set position')
+                
+                # set/detach players
                 
                 case ['setplayer_1']:
                     if checkPermission(command[1]) or self.player_1 is not None:
